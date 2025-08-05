@@ -85,19 +85,24 @@ class SafePriceFetcher:
             if not self.check_connection():
                 raise ConnectionError("Cybos Plus not connected")
             
-            self.wait_if_needed()
+            # A 접두사가 없으면 추가 (test_2.py와 동일하게)
+            query_code = code if code.startswith("A") else f"A{code}"
+            
+            # 기본 지연 시간만 적용 (불필요한 대기 제거)
+            delay = random.uniform(0.5, 1.5)
+            time.sleep(delay)
             
             # 종목 코드 설정
-            self._stock_mst.SetInputValue(0, code)
+            self._stock_mst.SetInputValue(0, query_code)
             
             # 데이터 요청
             result = self._stock_mst.BlockRequest()
             if result != 0:
-                print(f"Request failed for {code}: error code {result}")
+                print(f"Request failed for {query_code}: error code {result}")
                 return None
             
             # 데이터 추출
-            price_info = self._extract_single_price_data(code)
+            price_info = self._extract_single_price_data(code)  # 원본 코드 사용
             return price_info
             
         except Exception as e:
@@ -176,10 +181,13 @@ class SafePriceFetcher:
     def _fetch_batch_internal(self, codes: List[str]) -> List[PriceInfo]:
         """내부 배치 처리 함수"""
         try:
-            self.wait_if_needed()
+            # 기본 지연 시간만 적용
+            delay = random.uniform(0.5, 1.5)
+            time.sleep(delay)
             
-            # 종목 코드 문자열 생성 (쉼표로 구분)
-            code_string = ",".join(codes)
+            # A 접두사 추가 (단일 조회와 동일하게)
+            query_codes = [code if code.startswith("A") else f"A{code}" for code in codes]
+            code_string = ",".join(query_codes)
             
             # 입력값 설정
             self._stock_mst2.SetInputValue(0, code_string)
@@ -196,7 +204,7 @@ class SafePriceFetcher:
             
             for i in range(count):
                 try:
-                    price_info = self._extract_batch_price_data(i)
+                    price_info = self._extract_batch_price_data(i, codes[i] if i < len(codes) else None)
                     if price_info:
                         prices.append(price_info)
                 except Exception as e:
@@ -209,7 +217,7 @@ class SafePriceFetcher:
             print(f"Error in internal batch fetch: {e}")
             return []
     
-    def _extract_batch_price_data(self, index: int) -> Optional[PriceInfo]:
+    def _extract_batch_price_data(self, index: int, original_code: str = None) -> Optional[PriceInfo]:
         """StockMst2 응답에서 시세 데이터 추출"""
         try:
             # 기본 정보
@@ -217,10 +225,22 @@ class SafePriceFetcher:
             name = self._stock_mst2.GetDataValue(1, index)
             time_val = self._stock_mst2.GetDataValue(2, index)
             
+            # A 접두사 제거해서 원본 코드 사용
+            if original_code:
+                code = original_code
+            elif code.startswith("A"):
+                code = code[1:]
+            
             # 가격 정보
             current_price = self._stock_mst2.GetDataValue(3, index)
             change = self._stock_mst2.GetDataValue(4, index)
-            status = ord(self._stock_mst2.GetDataValue(5, index))  # char to int
+            
+            # 상태 정보 (문자열이면 ord() 사용, 정수면 그대로 사용)
+            status_raw = self._stock_mst2.GetDataValue(5, index)
+            if isinstance(status_raw, str):
+                status = ord(status_raw)
+            else:
+                status = int(status_raw) if status_raw is not None else 3
             
             # OHLC
             open_price = self._stock_mst2.GetDataValue(6, index)

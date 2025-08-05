@@ -193,6 +193,10 @@ class PriceTable:
         if row:
             columns = [desc[0] for desc in cursor.description]
             data = dict(zip(columns, row))
+            
+            # id 필드 제거 (PriceInfo에 없는 필드)
+            data.pop('id', None)
+            
             return PriceInfo.from_dict(data)
         
         return None
@@ -211,6 +215,8 @@ class PriceTable:
         
         for row in cursor.fetchall():
             data = dict(zip(columns, row))
+            # id 필드 제거 (PriceInfo에 없는 필드)
+            data.pop('id', None)
             prices.append(PriceInfo.from_dict(data))
         
         return prices

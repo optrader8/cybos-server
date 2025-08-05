@@ -1,0 +1,208 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cybos-server"
+version = "1.0.0"
+description = "Cybos Plus 기반 실시간 증권 시세 서버 (극단적 모듈화)"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Developer", email = "dev@example.com"}
+]
+maintainers = [
+    {name = "Developer", email = "dev@example.com"}
+]
+keywords = [
+    "cybos", "stock", "trading", "real-time", "api", 
+    "fastapi", "sqlite", "modular", "microservice"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.9,<3.10"
+dependencies = [
+    "pywin32>=306",
+    "fastapi>=0.104.1",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "sqlalchemy>=2.0.23",
+    "alembic>=1.13.1",
+    "httpx>=0.25.2",
+    "websockets>=12.0",
+    "requests>=2.31.0",
+    "python-multipart>=0.0.6",
+    "python-dateutil>=2.8.2",
+    "pytz>=2023.3",
+    "loguru>=0.7.2",
+    "structlog>=23.2.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.1",
+    "toml>=0.10.2",
+    "asyncio-mqtt>=0.16.1",
+    "cryptography>=41.0.8",
+    "click>=8.1.7",
+    "rich>=13.7.0",
+    "tqdm>=4.66.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "black>=23.11.0",
+    "isort>=5.12.0",
+    "flake8>=6.1.0",
+    "mypy>=1.7.1",
+]
+testing = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+]
+monitoring = [
+    "prometheus-client>=0.19.0",
+    "redis>=5.0.1",
+]
+all = [
+    "cybos-server[dev,testing,monitoring]"
+]
+
+[project.urls]
+Homepage = "https://github.com/username/cybos-server"
+Documentation = "https://github.com/username/cybos-server/wiki"
+Repository = "https://github.com/username/cybos-server.git"
+"Bug Tracker" = "https://github.com/username/cybos-server/issues"
+
+[project.scripts]
+cybos-server = "src.main:main"
+cybos-init-db = "scripts.init_database:main"
+cybos-sync = "scripts.sync_stock_codes:main"
+cybos-test = "scripts.test_connection:main"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "scripts*", "config*"]
+exclude = ["tests*", "docs*"]
+
+# Black formatter configuration
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | migrations
+)/
+'''
+
+# isort configuration
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["src", "scripts", "config"]
+known_third_party = ["fastapi", "pydantic", "sqlalchemy", "pytest"]
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "win32com.*",
+    "pythoncom.*",
+    "pywintypes.*",
+]
+ignore_missing_imports = true
+
+# Pytest configuration
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--tb=short",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-fail-under=80",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "cybos: marks tests that require Cybos Plus connection",
+]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+]
+
+# Coverage configuration  
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/migrations/*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+# Flake8 configuration (in setup.cfg or tox.ini format)
+# Note: Flake8 doesn't support pyproject.toml yet

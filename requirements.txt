@@ -1,0 +1,60 @@
+# Core Dependencies (Python 3.9 32bit)
+pywin32==311
+
+# Web Framework & API
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy==2.0.23
+alembic==1.13.1
+
+# HTTP Client & WebSocket
+httpx==0.25.2
+websockets==12.0
+requests==2.31.0
+
+# Data Processing & Validation
+python-multipart==0.0.6
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Logging & Monitoring
+loguru==0.7.2
+structlog==23.2.0
+
+# Configuration Management
+python-dotenv==1.0.0
+pyyaml==6.0.1
+toml==0.10.2
+
+# Async Support
+# asyncio is built-in Python module
+asyncio-mqtt==0.16.1
+
+# Testing (Development)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# Development Tools
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+
+# Security
+cryptography==3.4.8
+
+# Utilities
+click==8.1.7
+rich==13.7.0
+tqdm==4.66.1
+
+# Optional: For advanced features
+# redis==5.0.1  # For caching (if needed)
+# celery==5.3.4  # For background tasks (if needed)
+# prometheus-client==0.19.0  # For metrics (if needed)

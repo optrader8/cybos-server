@@ -198,9 +198,16 @@ def main():
             return 0
         
         # 결과 검증
-        if result and result.get("successful_stocks", 0) > 0:
-            print("\n✅ 시세 업데이트가 성공적으로 완료되었습니다!")
-            return 0
+        if result:
+            if args.dry_run:
+                print("\n✅ DRY RUN 모드 실행이 성공적으로 완료되었습니다!")
+                return 0
+            elif result.get("successful_stocks", 0) > 0:
+                print("\n✅ 시세 업데이트가 성공적으로 완료되었습니다!")
+                return 0
+            else:
+                print("\n⚠️  시세 업데이트 중 문제가 발생했습니다.")
+                return 1
         else:
             print("\n⚠️  시세 업데이트 중 문제가 발생했습니다.")
             return 1

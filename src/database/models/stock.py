@@ -249,3 +249,60 @@ class StockTable:
             result["total"] += count
         
         return result
+    
+    @classmethod
+    def get_kospi200_stocks(cls, conn: sqlite3.Connection) -> list[StockInfo]:
+        """KOSPI200 종목 목록 조회 (실시간 API 기반)"""
+        import win32com.client
+        import time
+        import random
+        
+        # KOSPI 종목만 조회 (KOSPI200은 KOSPI에만 있음)
+        kospi_stocks = cls.get_stocks_by_market(conn, MarketKind.KOSPI)
+        kospi200_stocks = []
+        
+        try:
+            # StockMst COM 객체 생성
+            stockMst = win32com.client.Dispatch("DsCbo1.StockMst")
+            
+            for stock in kospi_stocks:
+                try:
+                    # A 접두사 추가하여 조회
+                    full_code = f"A{stock.code}" if not stock.code.startswith('A') else stock.code
+                    
+                    # 데이터 요청 설정
+                    stockMst.SetInputValue(0, full_code)
+                    
+                    # 데이터 요청
+                    result = stockMst.BlockRequest()
+                    
+                    if result == 0:  # 성공
+                        # 53번 필드: KOSPI200 채용 여부
+                        kospi200_info = stockMst.GetHeaderValue(53)
+                        
+                        # 빈 문자열이나 '미채용'이 아니면 KOSPI200 종목
+                        if kospi200_info and kospi200_info.strip() and kospi200_info.strip() != "미채용":
+                            kospi200_stocks.append(stock)
+                    
+                    # 요청 제한 준수 (200ms ~ 500ms 지연)
+                    time.sleep(random.uniform(0.2, 0.5))
+                    
+                except Exception:
+                    # 개별 종목 조회 실패는 무시하고 계속 진행
+                    continue
+            
+        except Exception:
+            # COM 객체 생성 실패 시 데이터베이스의 kospi200_kind 필드 사용
+            # (백업 방법이지만 정확하지 않을 수 있음)
+            cursor = conn.execute(f"""
+                SELECT * FROM {cls.TABLE_NAME} 
+                WHERE market_kind = ? AND kospi200_kind != 0
+                ORDER BY code
+            """, (MarketKind.KOSPI,))
+            
+            columns = [desc[0] for desc in cursor.description]
+            for row in cursor.fetchall():
+                data = dict(zip(columns, row))
+                kospi200_stocks.append(StockInfo.from_dict(data))
+        
+        return kospi200_stocks

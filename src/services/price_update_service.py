@@ -186,7 +186,7 @@ class PriceUpdateService:
                 
                 # 불규칙한 대기 시간
                 if batch_num < total_batches:
-                    wait_time = random.uniform(schedule["safe_interval"], schedule["safe_interval"] * 1.5)
+                    wait_time = random.uniform(3.0, 10.0)
                     print(f"   ⏳ 다음 배치까지 {wait_time:.1f}초 대기...")
                     time.sleep(wait_time)
             
@@ -233,6 +233,110 @@ class PriceUpdateService:
             for error in self.stats["errors"][-5:]:  # 최근 5개만 표시
                 print(f"     - {error}")
     
+    def update_prices_for_stocks(self, stock_codes: List[str], dry_run: bool = False) -> Dict[str, Any]:
+        """특정 종목들의 시세 업데이트"""
+        print("🚀 특정 종목 시세 업데이트 서비스 시작")
+        print("=" * 50)
+        
+        # 통계 초기화
+        self.stats["start_time"] = datetime.now()
+        self.stats["errors"] = []
+        
+        try:
+            # 종목 코드를 StockInfo 형태로 변환 (모든 코드는 이미 A 접두사 포함)
+            target_stocks = []
+            
+            with get_connection_context(self.db_path) as conn:
+                for code in stock_codes:
+                    stock_info = StockTable.get_stock(conn, code)
+                    if stock_info:
+                        target_stocks.append({
+                            'code': stock_info.code,
+                            'name': stock_info.name,
+                            'market_kind': stock_info.market_kind
+                        })
+                    else:
+                        print(f"⚠️  종목을 찾을 수 없음: {code}")
+            
+            self.stats["total_stocks"] = len(target_stocks)
+            
+            if not target_stocks:
+                print("❌ 업데이트할 종목이 없습니다.")
+                return self.stats
+            
+            # 스케줄 계산
+            schedule = self.calculate_safe_schedule(len(target_stocks))
+            
+            print(f"📊 업데이트 계획:")
+            print(f"   대상 종목 수: {schedule['total_stocks']:,}")
+            print(f"   배치 수: {schedule['total_batches']:,}")
+            print(f"   배치 크기: {self.batch_size}")
+            print(f"   예상 소요 시간: {schedule['estimated_time_minutes']:.1f}분")
+            print(f"   예상 완료 시간: {schedule['estimated_completion'].strftime('%H:%M:%S')}")
+            
+            if dry_run:
+                print("🔍 DRY RUN 모드 - 실제 업데이트는 수행하지 않습니다.")
+                return self.stats
+            
+            # 확인 메시지
+            response = input("\n계속하시겠습니까? (y/N): ")
+            if response.lower() != 'y':
+                print("사용자에 의해 취소되었습니다.")
+                return self.stats
+            
+            # 배치 단위로 처리
+            print(f"\n📈 시세 업데이트 시작...")
+            
+            for i in range(0, len(target_stocks), self.batch_size):
+                batch_stocks = target_stocks[i:i + self.batch_size]
+                batch_num = i // self.batch_size + 1
+                total_batches = schedule["total_batches"]
+                
+                print(f"\n🔄 배치 {batch_num}/{total_batches} 처리 중... ({len(batch_stocks)}개 종목)")
+                
+                # 배치 처리
+                batch_start = time.time()
+                updated_prices = self.update_prices_batch(batch_stocks)
+                batch_time = time.time() - batch_start
+                
+                # 통계 업데이트
+                self.stats["processed_stocks"] += len(batch_stocks)
+                self.stats["successful_stocks"] += len(updated_prices)
+                self.stats["failed_stocks"] += len(batch_stocks) - len(updated_prices)
+                
+                # 진행 상황 출력
+                success_rate = len(updated_prices) / len(batch_stocks) * 100
+                print(f"   ✅ 성공: {len(updated_prices)}/{len(batch_stocks)} ({success_rate:.1f}%)")
+                print(f"   ⏱️  소요 시간: {batch_time:.1f}초")
+                
+                # 전체 진행률 계산
+                progress = (batch_num / total_batches) * 100
+                print(f"   📊 전체 진행률: {progress:.1f}%")
+                
+                # 불규칙한 대기 시간
+                if batch_num < total_batches:
+                    wait_time = random.uniform(3.0, 10.0)
+                    print(f"   ⏳ 다음 배치까지 {wait_time:.1f}초 대기...")
+                    time.sleep(wait_time)
+            
+            self.stats["end_time"] = datetime.now()
+            
+            # 최종 결과 출력
+            self._print_final_results()
+            
+            return self.stats
+            
+        except KeyboardInterrupt:
+            print("\n⚠️  사용자에 의해 중단되었습니다.")
+            self.stats["end_time"] = datetime.now()
+            return self.stats
+            
+        except Exception as e:
+            print(f"\n❌ 시스템 오류: {e}")
+            self.stats["errors"].append(f"System error: {e}")
+            self.stats["end_time"] = datetime.now()
+            return self.stats
+
     def cleanup_old_prices(self, days: int = 30) -> int:
         """오래된 시세 데이터 정리"""
         with get_connection_context(self.db_path) as conn:

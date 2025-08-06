@@ -31,7 +31,7 @@ except ImportError as e:
 class KOSPI200HistoryBatch:
     """KOSPI200 일봉 히스토리 배치 작업 클래스"""
     
-    def __init__(self, min_delay_minutes: int = 3, max_delay_minutes: int = 10):
+    def __init__(self, min_delay_minutes: float = 0.2, max_delay_minutes: float = 1.0):
         self.min_delay_minutes = min_delay_minutes
         self.max_delay_minutes = max_delay_minutes
         self.db_path = "data/cybos.db"
@@ -143,22 +143,25 @@ class KOSPI200HistoryBatch:
         return [{'code': code, 'name': name, 'kospi200_kind': 1} for code, name in fallback_codes]
     
     def wait_random_delay(self) -> None:
-        """3-10분 사이 불규칙한 대기"""
+        """12초-60초 사이 불규칙한 대기"""
         wait_minutes = random.uniform(self.min_delay_minutes, self.max_delay_minutes)
         wait_seconds = wait_minutes * 60
         
-        print(f"⏳ {wait_minutes:.1f}분({wait_seconds:.0f}초) 대기 중...")
+        print(f"⏳ {wait_seconds:.0f}초 대기 중...")
         
-        # 30초마다 진행 상황 출력
-        start_time = time.time()
-        while time.time() - start_time < wait_seconds:
-            remaining = wait_seconds - (time.time() - start_time)
-            if remaining > 30:
-                print(f"   ⏰ 남은 시간: {remaining/60:.1f}분")
-                time.sleep(30)
-            else:
-                time.sleep(remaining)
-                break
+        # 10초마다 진행 상황 출력 (60초 이상인 경우만)
+        if wait_seconds > 60:
+            start_time = time.time()
+            while time.time() - start_time < wait_seconds:
+                remaining = wait_seconds - (time.time() - start_time)
+                if remaining > 10:
+                    print(f"   ⏰ 남은 시간: {remaining:.0f}초")
+                    time.sleep(10)
+                else:
+                    time.sleep(remaining)
+                    break
+        else:
+            time.sleep(wait_seconds)
         
         print(f"✅ 대기 완료")
     
@@ -218,7 +221,7 @@ class KOSPI200HistoryBatch:
         print("🚀 KOSPI200 일봉 히스토리 배치 시작")
         print("=" * 60)
         print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"대기 시간: {self.min_delay_minutes}~{self.max_delay_minutes}분")
+        print(f"대기 시간: {self.min_delay_minutes*60:.0f}~{self.max_delay_minutes*60:.0f}초")
         print(f"업데이트 모드: {'증분' if incremental else '전체'}")
         
         # 통계 초기화
@@ -250,7 +253,7 @@ class KOSPI200HistoryBatch:
             
             print(f"\n📊 배치 계획:")
             print(f"   대상 종목: {len(kospi200_stocks)}개")
-            print(f"   평균 대기 시간: {avg_delay_minutes:.1f}분")
+            print(f"   평균 대기 시간: {avg_delay_minutes*60:.0f}초")
             print(f"   예상 소요 시간: {estimated_hours:.1f}시간")
             print(f"   예상 완료 시간: {estimated_completion.strftime('%Y-%m-%d %H:%M:%S')}")
             
@@ -358,14 +361,14 @@ def main():
     
     parser.add_argument("--dry-run", action="store_true", help="실제 실행 없이 계획만 출력")
     parser.add_argument("--full", action="store_true", help="전체 업데이트 (기존 데이터 무시)")
-    parser.add_argument("--min-delay", type=int, default=3, help="최소 대기 시간 (분, 기본: 3)")
-    parser.add_argument("--max-delay", type=int, default=10, help="최대 대기 시간 (분, 기본: 10)")
+    parser.add_argument("--min-delay", type=float, default=0.2, help="최소 대기 시간 (분, 기본: 0.2 = 12초)")
+    parser.add_argument("--max-delay", type=float, default=1.0, help="최대 대기 시간 (분, 기본: 1.0 = 60초)")
     
     args = parser.parse_args()
     
     # 입력 검증
-    if args.min_delay < 1 or args.max_delay < 1:
-        print("❌ 대기 시간은 최소 1분 이상이어야 합니다.")
+    if args.min_delay < 0.1 or args.max_delay < 0.1:
+        print("❌ 대기 시간은 최소 0.1분 이상이어야 합니다.")
         return
     
     if args.min_delay >= args.max_delay:

@@ -17,10 +17,10 @@ if exist "env\Scripts\activate.bat" (
 
 REM KOSPI200 일봉 히스토리 배치 실행
 echo KOSPI200 일봉 히스토리 배치 시작...
-echo 대기시간: 3-10분 랜덤
+echo 대기시간: 12-60초 랜덤
 echo.
 
-python kospi200_daily_batch.py --min-delay 3 --max-delay 10
+python kospi200_daily_batch.py --min-delay 0.2 --max-delay 1.0
 
 echo.
 echo 완료 시간: %date% %time%

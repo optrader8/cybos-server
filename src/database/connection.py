@@ -12,6 +12,8 @@ from typing import Optional, List
 from contextlib import contextmanager
 
 from .models.stock import StockTable
+from .models.price import PriceTable
+from .models.history import HistoryTable
 
 
 class DatabaseManager:
@@ -47,7 +49,16 @@ class DatabaseManager:
             StockTable.create_table(conn)
             StockTable.create_indexes(conn)
             
+            # 시세 테이블 생성
+            PriceTable.create_table(conn)
+            PriceTable.create_indexes(conn)
+            
+            # 히스토리 테이블 생성
+            HistoryTable.create_table(conn)
+            HistoryTable.create_indexes(conn)
+            
             print(f"Database initialized at: {self.db_path}")
+            print("✅ All tables created: stocks, prices, historical_prices")
     
     def get_db_info(self) -> dict:
         """데이터베이스 정보 조회"""

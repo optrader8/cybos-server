@@ -1,160 +1,99 @@
-StockMstM
+네, 알겠습니다. 제공해주신 `StockMstM` API 명세서를 이전과 동일한 형식으로 명확하게 재구성하여 보여드리겠습니다.
 
-설명
+-----
 
-주식 복수 종목에 대해 간단한 내용을 일괄 조회 요청하고 수신한다
+# API 명세서: StockMstM
 
-통신종류
+## 1\. 개요
 
-Request/Reply
+`StockMstM`은 다수의 주식 종목에 대해 간단한 시세 정보(현재가, 대비, 호가 등)를 일괄적으로 조회하기 위한 COM 객체입니다.
 
-연속여부
+  - **주요 기능**: 여러 종목의 핵심 시세 정보를 한 번의 요청으로 빠르게 수신합니다.
+  - **관련 CYBOS 화면**: [7059 관심종목조회]
+  - **모듈 위치**: `cpdib.dll`
 
-X
+## 2\. 통신 방식
 
-관련 SB/PB
+  - **통신 종류**: Request/Reply
+  - **연속 데이터 여부**: 연속적이지 않음 (X)
 
-StockCur
+## 3\. Methods
 
-관련CYBOS
+### 3.1. `object.SetInputValue(type, value)`
 
-[7059 관심종목조회]
+데이터 요청에 필요한 입력 값을 설정합니다.
 
-모듈 위치
+| `type` | 입력 데이터 종류 | `value` 데이터 타입 | 비고 |
+| :--- | :--- | :--- | :--- |
+| **0** | **다수의 종목코드** | `string` | - 종목코드를 구분자 없이 이어서 붙여 사용\<br\>- 최대 110개까지 가능\<br\>- 예시: "A003540A000060A000010" |
 
-cpdib.dll
+### 3.2. `object.Request()` / `object.BlockRequest()`
 
-Method
+설정된 여러 종목 코드에 대한 데이터를 서버에 요청합니다.
 
-object.SetInputValue(type,value)
+  - `object.Request()`: Non-blocking 방식으로 데이터를 요청하며, 결과는 `Received` 이벤트를 통해 수신됩니다.
+  - `object.BlockRequest()`: Blocking 방식으로 데이터를 요청하며, 데이터 수신이 완료될 때까지 대기합니다.
 
-type에 해당하는 입력 데이터를 value 값으로 지정합니다
+### 3.3. `object.GetHeaderValue(type)`
 
-type: 입력 데이터 종류
+요청에 대한 응답으로 받은 헤더(Header) 데이터를 반환합니다.
 
-0 - (string) 다수의 종목코드
-ex) A003540A000060A000010 (MAX:110개)
+| `type` | 헤더 데이터 종류 | 반환 타입 | 설명 |
+| :--- | :--- | :--- | :--- |
+| **0** | **count** | `short` | 수신된 데이터(종목)의 개수 |
 
-value: 새로 지정할 값
+### 3.4. `object.GetDataValue(Type, index)`
 
-value = object.GetHeaderValue(type)
+수신된 상세 데이터를 인덱스로 조회합니다. `BlockRequest` 또는 `Received` 이벤트 내에서 사용됩니다.
 
-type에 해당하는 헤더 데이터를 반환합니다
+  - `Type`: 조회할 데이터 종류 (0 \~ 11)
+  - `index`: 조회할 종목의 인덱스
 
-type: 데이터 종류
+| `Type` | 데이터 종류 | 반환 타입 / 비고 |
+| :--- | :--- | :--- |
+| **0** | 종목 코드 | `string` |
+| **1** | 종목명 | `string` |
+| **2** | 대비 | `long` |
+| **3** | 대비 구분 코드 | `shot` \<br\> **(상세 코드는 [5.1. 대비 구분 코드](https://www.google.com/search?q=%2351-%EB%8C%80%EB%B9%84-%EA%B5%AC%EB%B6%84-%EC%BD%94%EB%93%9C-getdatavaluetype-3) 참고)** |
+| **4** | 현재가 | `long` |
+| **5** | 매도호가 | `long` |
+| **6** | 매수호가 | `long` |
+| **7** | 거래량 | `unsigned long` |
+| **8** | 장 구분 플래그 | `char` \<br\> **(상세 코드는 [5.2. 장 구분 플래그](https://www.google.com/search?q=%2352-%EC%9E%A5-%EA%B5%AC%EB%B6%84-%ED%94%8C%EB%9E%98%EA%B7%B8-getdatavaluetype-8) 참고)** |
+| **9** | 예상 체결가 | `long` |
+| **10** | 예상 체결가 전일 대비 | `long` |
+| **11** | 예상 체결 수량 | `unsigned long` |
 
-0 - (short) count
+### 3.5. `object.Subscribe()` / `object.Unsubscribe()`
 
-반환값: 데이터 종류에 해당하는 값
+`StockMstM` 객체에서는 사용하지 않습니다.
 
-value = object.GetDataValue(Type,Index)
+## 4\. Events
 
-type에 해당하는 데이터를 반환합니다
+### 4.1. `Object.Received`
 
-type: 데이터 종류
+`Request()`를 통해 요청한 다수 종목의 데이터 수신이 완료되었을 때 발생하는 이벤트입니다.
 
-0 - (string) 종목 코드
+## 5\. 상세 코드 정보
 
-1 - (string) 종목명
+### 5.1. 대비 구분 코드 (`GetDataValue(type: 3)`)
 
-2 - (long) 대비
+| 코드 | 내용 |
+| :--- | :--- |
+| **1** | 상한 |
+| **2** | 상승 |
+| **3** | 보합 |
+| **4** | 하한 |
+| **5** | 하락 |
+| **6** | 기세상한 |
+| **7** | 기세상승 |
+| **8** | 기세하한 |
+| **9** | 기세하락 |
 
-3 - (shot) 대비 구분 코드
+### 5.2. 장 구분 플래그 (`GetDataValue(type: 8)`)
 
-코드
-
-내용
-
-1
-
-상한
-
-2
-
-상승
-
-3
-
-보합
-
-4
-
-하한
-
-5
-
-하락
-
-6
-
-기세상한
-
-7
-
-기세상승
-
-8
-
-기세하한
-
-9
-
-기세하락
-
-4 - (long) 현재가
-
-5 - (long) 매도호가
-
-6 - (long) 매수호가
-
-7 - (unsigned long) 거래량
-
-8 - (char) 장 구분 플래그
-
-코드
-
-내용
-
-'0'
-
-동시호가와 장중이외의 시간
-
-'1'
-
-동시호가시간(예상체결가 들어오는 시간)
-
-'2'
-
-장중
-
-9 - (long) 예상 체결가
-
-10 - (long) 예상 체결가 전일 대비
-
-11 - (unsigned long) 예상 체결 수량
-
-index: data index
-
-반환값: 데이터 종류의 index번째 data
-
-object.Subscribe()
-
-사용하지 않음
-
-object.Unsubscribe()
-
-사용하지 않음
-
-object.Request()
-
-다수의 종목 코드에 해당하는 데이터를 요청한다
-
-object.BlockRequest()
-
-데이터 요청.Blocking Mode
-
-Event
-Object.Received
-
-다수의 종목코드 데이터를 수신할 때 발생하는 이벤트
-
+| 코드 | 내용 |
+| :--- | :--- |
+| **'0'** | 동시호가와 장중이외의 시간 |
+| **'1'** | 동시호가시간(예상체결가 들어오는 시간) |
+| **'2'** | 장중 |

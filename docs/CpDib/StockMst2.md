@@ -1,254 +1,109 @@
-StockMst2
+네, 알겠습니다. 제공해주신 `StockMst2` API 명세서를 이전 작업과 동일한 형식으로 명확하게 재구성하여 보여드리겠습니다.
 
-설명
+-----
 
-주식 복수 종목에 대해 일괄 조회를 요청하고 수신한다
+# API 명세서: StockMst2
 
-통신종류
+## 1\. 개요
 
-Request/Reply
+`StockMst2`는 다수의 주식 종목에 대한 현재가 관련 정보를 일괄적으로 조회하기 위한 COM 객체입니다.
 
-연속여부
+  - **주요 기능**: 여러 종목의 현재가, 호가, 거래량 등의 데이터를 한 번의 요청으로 수신합니다.
+  - **관련 CYBOS 화면**: [7059 관심종목조회]
+  - **모듈 위치**: `cpdib.dll`
 
-X
+## 2\. 통신 방식
 
-관련 SB/PB
+  - **통신 종류**: Request/Reply
+  - **연속 데이터 여부**: 연속적이지 않음 (X)
 
-StockCur
+## 3\. Methods
 
-관련CYBOS
+### 3.1. `object.SetInputValue(type, value)`
 
-[7059 관심종목조회]
+데이터 요청에 필요한 입력 값을 설정합니다.
 
-모듈 위치
+| `type` | 입력 데이터 종류 | `value` 데이터 타입 | 비고 |
+| :--- | :--- | :--- | :--- |
+| **0** | **다수의 종목코드** | `string` | - 구분자: ',' (쉼표)\<br\>- 최대 110종목까지 가능\<br\>- 예시: "A003540,A000060,A000010" |
 
-cpdib.dll
+### 3.2. `object.Request()` / `object.BlockRequest()`
 
-Method
-object.SetInputValue(type,value)
+설정된 여러 종목 코드에 대한 데이터를 서버에 요청합니다.
 
-type에 해당하는 입력 데이터를 value 값으로 지정합니다
+  - `object.Request()`: Non-blocking 방식으로 데이터를 요청합니다. 결과는 `Received` 이벤트를 통해 수신됩니다.
+  - `object.BlockRequest()`: Blocking 방식으로 데이터를 요청합니다. 데이터 수신이 완료될 때까지 대기합니다.
 
-type: 입력 데이터 종류
+### 3.3. `object.GetHeaderValue(type)`
 
-0 - (string) 다수의 종목코드(구분자:',' , MAX: 110종목) 예) A003540,A000060,A000010
+요청에 대한 응답으로 받은 헤더(Header) 데이터를 반환합니다.
 
-value: 새로 지정할 값
+| `type` | 헤더 데이터 종류 | 반환 타입 | 설명 |
+| :--- | :--- | :--- | :--- |
+| **0** | **count** | `short` | 수신된 데이터(종목)의 개수 |
 
-value = object.GetHeaderValue(type)
+### 3.4. `object.GetDataValue(Type, index)`
 
-type에 해당하는 헤더 데이터를 반환합니다
+수신된 상세 데이터를 인덱스로 조회합니다. `BlockRequest` 또는 `Received` 이벤트 내에서 사용됩니다.
 
-type: 데이터 종류
+  - `Type`: 조회할 데이터 종류 (0 \~ 29)
+  - `index`: 조회할 종목의 인덱스 (0부터 `GetHeaderValue(0) - 1` 까지)
 
-0 - (short) count
+| `Type` | 데이터 종류 | 반환 타입 / 비고 |
+| :--- | :--- | :--- |
+| **0** | 종목 코드 | `string` |
+| **1** | 종목명 | `string` |
+| **2** | 시간(HHMM) | `long` |
+| **3** | 현재가 | `long` |
+| **4** | 전일대비 | `long` |
+| **5** | 상태구분 | `char` \<br\> **(상세 코드는 [5.1. 상태 구분 코드](https://www.google.com/search?q=%2351-%EC%83%81%ED%83%9C-%EA%B5%AC%EB%B6%84-%EC%BD%94%EB%93%9C-getdatavaluetype-5-28) 참고)** |
+| **6** | 시가 | `long` |
+| **7** | 고가 | `long` |
+| **8** | 저가 | `long` |
+| **9** | 매도호가 | `long` |
+| **10** | 매수호가 | `long` |
+| **11** | 거래량 | `unsigned long`\<br\>**[주의]** 단위: 1주 |
+| **12** | 거래대금 | `long`\<br\>**[주의]** 단위: 천원 |
+| **13** | 총매도잔량 | `long` |
+| **14** | 총매수잔량 | `long` |
+| **15** | 매도잔량 | `long` |
+| **16** | 매수잔량 | `long` |
+| **17** | 상장주식수 | `unsigned long` |
+| **18** | 외국인보유비율(%) | `long` |
+| **19** | 전일종가 | `long` |
+| **20** | 전일거래량 | `unsigned long` |
+| **21** | 체결강도 | `long` |
+| **22** | 순간체결량 | `unsigned long` |
+| **23** | 체결가비교 Flag | `char`\<br\>'O': 매도, 'B': 매수 |
+| **24** | 호가비교 Flag | `char`\<br\>'O': 매도, 'B': 매수 |
+| **25** | 동시호가구분 | `char`\<br\>'1': 동시호가, '2': 장중 |
+| **26** | 예상체결가 | `long` |
+| **27** | 예상체결가 전일대비 | `long` |
+| **28** | 예상체결가 상태구분 | `long`\<br\>**(상세 코드는 [5.1. 상태 구분 코드](https://www.google.com/search?q=%2351-%EC%83%81%ED%83%9C-%EA%B5%AC%EB%B6%84-%EC%BD%94%EB%93%9C-getdatavaluetype-5-28) 참고)** |
+| **29** | 예상체결가 거래량 | `unsigned long` |
 
-반환값: 데이터 종류에 해당하는 값
+### 3.5. `object.Subscribe()` / `object.Unsubscribe()`
 
-value = object.GetDataValue(Type,Index)
+`StockMst2` 객체에서는 사용하지 않습니다.
 
-type에 해당하는 데이터를 반환합니다
+## 4\. Events
 
-type: 데이터 종류
+### 4.1. `Object.Received`
 
-0 - (string) 종목 코드
+`Request()`를 통해 요청한 다수 종목의 데이터 수신이 완료되었을 때 발생하는 이벤트입니다.
 
-1 - (string) 종목명
+## 5\. 상세 코드 정보
 
-2 - (long) 시간(HHMM)
+### 5.1. 상태 구분 코드 (`GetDataValue(type: 5, 28)`)
 
-3 - (long) 현재가
-
-4 - (long) 전일대비
-
-5 - (char) 상태구분
-
-코드
-
-내용
-
-'1'
-
-상한
-
-'2'
-
-상승
-
-'3'
-
-보합
-
-'4'
-
-하한
-
-'5'
-
-하락
-
-'6'
-
-기세상한
-
-'7'
-
-기세상승
-
-'8'
-
-기세하한
-
-'9'
-
-기세하락
-
-6 - (long) 시가
-
-7 - (long) 고가
-
-8 - (long) 저가
-
-9 - (long) 매도호가
-
-10 - (long) 매수호가
-
-11 - (unsigned long) 거래량 [주의] 단위 1주
-
-12 - (long) 거래대금 [주의] 단위 천원
-
-13 - (long) 총매도잔량
-
-14 - (long) 총매수잔량
-
-15 - (long) 매도잔량
-
-16 - (long) 매수잔량
-
-17 - (unsigned long) 상장주식수
-
-18 - (long) 외국인보유비율(%)
-
-19 - (long) 전일종가
-
-20 - (unsigned long) 전일거래량
-
-21 - (long) 체결강도
-
-22 - (unsigned long) 순간체결량
-
-23 - (char) 체결가비교 Flag
-
-코드
-
-내용
-
-'O'
-
-매도
-
-'B'
-
-매수
-
-24 - (char) 호가비교 Flag
-
-코드
-
-내용
-
-'O'
-
-매도
-
-'B'
-
-매수
-
-25- (char) 동시호가구분
-
-코드
-
-내용
-
-'1'
-
-동시호가
-
-'2'
-
-장중
-
-26 - (long) 예상체결가
-
-27 - (long) 예상체결가 전일대비
-
-28 - (long) 예상체결가 상태구분
-
-코드
-
-내용
-
-'1'
-
-상한
-
-'2'
-
-상승
-
-'3'
-
-보합
-
-'4'
-
-하한
-
-'5'
-
-하락
-
-'6'
-
-기세상한
-
-'7'
-
-기세상승
-
-'8'
-
-기세하한
-
-'9'
-
-기세하락
-
-29- (unsigned long) 예상체결가 거래량
-
-index: data index
-
-반환값: 데이터 종류의 index번째 data
-
-object.Subscribe()
-
-사용하지 않음
-
-object.Unsubscribe()
-
-사용하지 않음
-
-object.Request()
-
-다수의 종목 코드에 해당하는 데이터를 요청한다
-
-object.BlockRequest()
-
-데이터 요청.Blocking Mode
-
-Event
-Object.Received
-
-다수의 종목코드 데이터를 수신할 때 발생하는 이벤트
-
+| 코드 | 내용 |
+| :--- | :--- |
+| **'1'** | 상한 |
+| **'2'** | 상승 |
+| **'3'** | 보합 |
+| **'4'** | 하한 |
+| **'5'** | 하락 |
+| **'6'** | 기세상한 |
+| **'7'** | 기세상승 |
+| **'8'** | 기세하한 |
+| **'9'** | 기세하락 |

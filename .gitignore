@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -26,6 +26,11 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# Allow TypeScript/JavaScript lib folders
+!apps/**/lib/
+!packages/**/lib/
+!services/**/lib/
 
 # PyInstaller
 *.manifest

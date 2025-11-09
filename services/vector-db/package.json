@@ -1,0 +1,13 @@
+{
+  "name": "@cybos-trading/vector-db",
+  "version": "1.0.0",
+  "description": "시계열 임베딩 및 벡터 DB 서비스",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "python main.py",
+    "test": "pytest tests/",
+    "lint": "ruff check .",
+    "format": "ruff format ."
+  }
+}

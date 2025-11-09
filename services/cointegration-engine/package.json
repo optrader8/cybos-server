@@ -1,0 +1,15 @@
+{
+  "name": "@cybos-trading/cointegration-engine",
+  "version": "1.0.0",
+  "description": "공적분 분석 및 페어 검색 엔진",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "python main.py",
+    "test": "pytest tests/",
+    "lint": "ruff check .",
+    "format": "ruff format ."
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

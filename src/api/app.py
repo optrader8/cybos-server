@@ -62,6 +62,12 @@ def create_app() -> FastAPI:
         # WebSocket 실시간 스트리밍 시작
         await start_price_streaming()
 
+        # Signal Generator 시작 (환경변수에서 활성화 여부 확인)
+        if os.getenv("SIGNAL_GENERATOR_ENABLED", "false").lower() == "true":
+            from ...services import start_monitor
+            await start_monitor()
+            print("✅ Signal generator started")
+
     # 루트 엔드포인트
     @app.get("/")
     async def root():

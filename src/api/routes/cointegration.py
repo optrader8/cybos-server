@@ -126,22 +126,87 @@ async def analyze_cointegration(request: CointegrationAnalyzeRequest):
     공적분 분석 실행
 
     종목 간 공적분 관계를 분석합니다.
-    (실제 분석 로직은 백그라운드 서비스에서 구현 필요)
     """
-    # TODO: 실제 공적분 분석 로직 구현
-    # 현재는 Mock 응답 반환
+    if len(request.stock_codes) != 2:
+        raise HTTPException(status_code=400, detail="Currently only 2-stock pairs are supported")
 
+    db_path = os.getenv("DATABASE_PATH", "data/cybos.db")
     pair_id = "_".join(sorted(request.stock_codes))
 
-    # 실제 분석 로직이 구현되면 아래 코드로 대체
-    # from services.cointegration_engine import analyze_pair
-    # result = analyze_pair(request.stock_codes, request.method, request.window_days)
+    try:
+        from ...services.cointegration_analyzer import get_analyzer, CointegrationMethod
+        from ...database.models.price import PriceTable
+        from datetime import datetime, timedelta
 
-    return CointegrationAnalyzeResponse(
-        success=True,
-        message="Cointegration analysis request received. Analysis will be performed in background.",
-        result=None
-    )
+        with get_connection_context(db_path) as conn:
+            # 가격 데이터 조회
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=request.window_days)
+
+            prices_data = {}
+            for stock_code in request.stock_codes:
+                prices = PriceTable.get_recent_prices(conn, stock_code, request.window_days)
+                if not prices:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"No price data found for stock: {stock_code}"
+                    )
+                prices_data[stock_code] = [p.close for p in prices]
+
+            # 가격 데이터 길이 확인
+            if len(prices_data[request.stock_codes[0]]) < 30:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Insufficient data: need at least 30 observations"
+                )
+
+            # 공적분 분석 실행
+            analyzer = get_analyzer()
+            method = CointegrationMethod(request.method)
+
+            analysis_result = analyzer.analyze_pair(
+                prices_data[request.stock_codes[0]],
+                prices_data[request.stock_codes[1]],
+                method
+            )
+
+            # 결과를 데이터베이스에 저장
+            result_obj = CointegrationResult(
+                result_id="",  # auto-generated
+                pair_id=pair_id,
+                stock_codes=request.stock_codes,
+                method=request.method,
+                test_statistic=analysis_result["test_statistic"],
+                p_value=analysis_result["p_value"],
+                critical_values=analysis_result["critical_values"],
+                cointegration_vector=analysis_result["cointegration_vector"],
+                hedge_ratios=analysis_result["hedge_ratios"],
+                intercept=analysis_result["intercept"],
+                residuals_mean=analysis_result["residuals_mean"],
+                residuals_std=analysis_result["residuals_std"],
+                half_life=analysis_result["half_life"],
+                adf_statistic=analysis_result["adf_statistic"],
+                adf_p_value=analysis_result["adf_p_value"],
+                sample_size=analysis_result["sample_size"],
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d"),
+                significance=analysis_result["significance"],
+                window_days=request.window_days
+            )
+
+            CointegrationTable.insert_result(conn, result_obj)
+            conn.commit()
+
+            return CointegrationAnalyzeResponse(
+                success=True,
+                message="Cointegration analysis completed successfully.",
+                result=_result_to_response(result_obj)
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cointegration analysis failed: {str(e)}")
 
 
 @router.get("/summary/stats", response_model=CointegrationSummaryResponse)

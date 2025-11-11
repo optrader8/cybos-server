@@ -34,23 +34,109 @@ async def run_backtest(request: BacktestRequest):
     백테스트 실행
 
     페어 트레이딩 전략을 과거 데이터로 백테스트합니다.
-    (실제 백테스트 엔진은 백그라운드 서비스에서 구현 필요)
     """
-    # TODO: 실제 백테스트 로직 구현
-    # 현재는 Mock 응답 반환
+    from ...services.backtest_engine import BacktestEngine, BacktestConfig
+    from ...database.models.price import PriceTable
+    from ...database.models.signal import SignalTable
+    from datetime import datetime
 
-    # 실제 백테스트 로직이 구현되면 아래 코드로 대체
-    # from services.backtest_engine import run_backtest
-    # results = run_backtest(request)
+    db_path = os.getenv("DATABASE_PATH", "data/cybos.db")
 
-    return BacktestResponse(
-        success=True,
-        message="Backtest request received. Analysis will be performed in background.",
-        results=[],
-        portfolio_return=0.0,
-        portfolio_sharpe=0.0,
-        portfolio_max_dd=0.0
-    )
+    try:
+        with get_connection_context(db_path) as conn:
+            # 백테스트 설정
+            config = BacktestConfig(
+                initial_capital=request.initial_capital,
+                start_date=datetime.strptime(request.start_date, "%Y-%m-%d"),
+                end_date=datetime.strptime(request.end_date, "%Y-%m-%d"),
+                commission_rate=float(os.getenv("BACKTEST_COMMISSION_RATE", "0.0015")),
+                slippage_rate=float(os.getenv("BACKTEST_SLIPPAGE_RATE", "0.001")),
+                risk_free_rate=float(os.getenv("BACKTEST_RISK_FREE_RATE", "0.03"))
+            )
+
+            # 백테스트 엔진 생성
+            engine = BacktestEngine(config)
+
+            # 가격 데이터 수집
+            price_data = {}
+            all_stock_codes = set()
+
+            for pair_id in request.pair_ids:
+                pair = PairTable.get_pair(conn, pair_id)
+                if pair:
+                    all_stock_codes.update(pair.stock_codes)
+
+            # 각 종목의 가격 데이터 조회
+            for stock_code in all_stock_codes:
+                prices = PriceTable.get_price_history(
+                    conn,
+                    stock_code,
+                    config.start_date.strftime("%Y%m%d"),
+                    config.end_date.strftime("%Y%m%d")
+                )
+
+                if prices:
+                    price_data[stock_code] = {
+                        datetime.strptime(p.date, "%Y%m%d"): p.close for p in prices
+                    }
+
+            if not price_data:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No price data found for the specified period"
+                )
+
+            # 신호 데이터 수집 (해당 기간의 신호)
+            signals = []
+            for pair_id in request.pair_ids:
+                pair_signals = SignalTable.get_signals_by_pair(conn, pair_id)
+                for signal in pair_signals:
+                    signal_date = datetime.fromisoformat(signal.created_at)
+                    if config.start_date <= signal_date <= config.end_date:
+                        signals.append({
+                            "date": signal_date,
+                            "signal_type": signal.signal_type.value,
+                            "pair_id": signal.pair_id,
+                            "long_code": signal.stock_codes[0] if len(signal.stock_codes) > 0 else None,
+                            "short_code": signal.stock_codes[1] if len(signal.stock_codes) > 1 else None,
+                            "long_quantity": 100,  # 기본값
+                            "short_quantity": 100,
+                            "hedge_ratio": signal.hedge_ratios[0] if signal.hedge_ratios else 1.0
+                        })
+
+            # 백테스트 실행
+            result = engine.run(price_data, signals)
+
+            # 결과 변환
+            backtest_results = [
+                BacktestResult(
+                    pair_id=pair_id,
+                    total_return=result.metrics["total_return"],
+                    annualized_return=result.metrics["annualized_return"],
+                    sharpe_ratio=result.metrics["sharpe_ratio"],
+                    sortino_ratio=result.metrics["sortino_ratio"],
+                    max_drawdown=result.metrics["max_drawdown"],
+                    volatility=result.metrics["volatility"],
+                    win_rate=result.metrics["win_rate"],
+                    profit_factor=result.metrics["profit_factor"],
+                    total_trades=result.metrics["total_trades"]
+                )
+                for pair_id in request.pair_ids
+            ]
+
+            return BacktestResponse(
+                success=True,
+                message="Backtest completed successfully.",
+                results=backtest_results,
+                portfolio_return=result.metrics["total_return"],
+                portfolio_sharpe=result.metrics["sharpe_ratio"],
+                portfolio_max_dd=result.metrics["max_drawdown"]
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backtest failed: {str(e)}")
 
 
 @router.get("/portfolio", response_model=PortfolioResponse)
@@ -95,19 +181,86 @@ async def execute_trade(request: TradeExecutionRequest):
     거래 실행
 
     트레이딩 신호를 실제 거래로 실행합니다.
-    (실제 거래 실행 시스템이 필요)
+    (Paper Trading 모드 - 실제 주문은 발생하지 않습니다)
     """
-    # TODO: 실제 거래 실행 로직 구현
-    # 현재는 Mock 응답 반환
+    from ...database.models.price import PriceTable
+    from ...database.models.signal import SignalStatus
 
-    return TradeExecutionResponse(
-        success=True,
-        message="Trade execution request received. Will be processed in background.",
-        signal_id=request.signal_id,
-        executed_prices={},
-        executed_quantities={},
-        total_cost=0.0
-    )
+    db_path = os.getenv("DATABASE_PATH", "data/cybos.db")
+
+    try:
+        with get_connection_context(db_path) as conn:
+            # 신호 조회
+            signal = SignalTable.get_signal(conn, request.signal_id)
+            if signal is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Signal not found: {request.signal_id}"
+                )
+
+            # 신호 상태 확인
+            if signal.status != SignalStatus.ACTIVE:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Signal is not active: {signal.status.value}"
+                )
+
+            # 현재 가격 조회
+            executed_prices = {}
+            for stock_code in signal.stock_codes:
+                price = PriceTable.get_latest_price(conn, stock_code)
+                if price:
+                    executed_prices[stock_code] = float(price.close)
+                else:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"No price data for stock: {stock_code}"
+                    )
+
+            # 거래 수량 (신호에서 제안된 수량 또는 기본값)
+            executed_quantities = {
+                stock_code: request.quantity or 100
+                for stock_code in signal.stock_codes
+            }
+
+            # 총 비용 계산
+            total_cost = sum(
+                executed_prices[code] * executed_quantities[code]
+                for code in signal.stock_codes
+            )
+
+            # 신호 상태 업데이트
+            SignalTable.update_signal_status(
+                conn,
+                request.signal_id,
+                SignalStatus.EXECUTED
+            )
+
+            # 실행 가격 업데이트
+            SignalTable.update_signal(
+                conn,
+                request.signal_id,
+                {"exit_prices": executed_prices}
+            )
+
+            conn.commit()
+
+            # Trading 모드 확인
+            trading_mode = os.getenv("TRADING_MODE", "paper")
+
+            return TradeExecutionResponse(
+                success=True,
+                message=f"Trade executed successfully in {trading_mode} mode.",
+                signal_id=request.signal_id,
+                executed_prices=executed_prices,
+                executed_quantities=executed_quantities,
+                total_cost=total_cost
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Trade execution failed: {str(e)}")
 
 
 @router.get("/performance", response_model=PerformanceResponse)
@@ -220,13 +373,81 @@ async def get_risk_exposure():
 
     포트폴리오의 현재 리스크 노출도를 조회합니다.
     """
-    # TODO: 실제 리스크 관리 시스템 구현
-    # 현재는 Mock 응답 반환
+    from ...database.models.price import PriceTable
+    import numpy as np
 
-    return {
-        "total_exposure": 8000000,
-        "max_pair_exposure": 2000000,
-        "margin_usage": 0.4,
-        "var_95": 350000,  # Value at Risk (95%)
-        "risk_level": "MEDIUM"
-    }
+    db_path = os.getenv("DATABASE_PATH", "data/cybos.db")
+
+    try:
+        with get_connection_context(db_path) as conn:
+            # 활성 신호 조회
+            active_signals = SignalTable.get_active_signals(conn)
+
+            # 총 노출도 계산
+            total_exposure = 0.0
+            pair_exposures = {}
+
+            for signal in active_signals:
+                if signal.current_prices:
+                    # 각 페어의 노출도 계산
+                    pair_exposure = sum(
+                        signal.current_prices.get(code, 0) * 100  # 기본 수량 100
+                        for code in signal.stock_codes
+                    )
+                    total_exposure += pair_exposure
+                    pair_exposures[signal.pair_id] = pair_exposure
+
+            # 최대 페어 노출도
+            max_pair_exposure = max(pair_exposures.values()) if pair_exposures else 0.0
+
+            # 마진 사용률 (총 자본 대비)
+            initial_capital = float(os.getenv("BACKTEST_INITIAL_CAPITAL", "100000000"))
+            margin_usage = total_exposure / initial_capital if initial_capital > 0 else 0.0
+
+            # VaR 계산 (간단한 Historical VaR)
+            var_confidence = float(os.getenv("RISK_VAR_CONFIDENCE", "0.95"))
+
+            # 최근 수익률 수집 (간단히 시뮬레이션)
+            returns = []
+            for signal in active_signals:
+                if signal.current_prices and signal.entry_prices:
+                    for code in signal.stock_codes:
+                        entry = signal.entry_prices.get(code, 0)
+                        current = signal.current_prices.get(code, 0)
+                        if entry > 0:
+                            ret = (current - entry) / entry
+                            returns.append(ret)
+
+            # VaR 계산
+            if returns:
+                returns_array = np.array(returns)
+                var_percentile = (1 - var_confidence) * 100
+                var_return = np.percentile(returns_array, var_percentile)
+                var_95 = abs(var_return * total_exposure)
+            else:
+                var_95 = 0.0
+
+            # 리스크 레벨 판단
+            max_exposure_pct = float(os.getenv("RISK_MAX_PORTFOLIO_EXPOSURE", "0.8"))
+
+            if margin_usage < 0.3:
+                risk_level = "LOW"
+            elif margin_usage < 0.6:
+                risk_level = "MEDIUM"
+            elif margin_usage < max_exposure_pct:
+                risk_level = "HIGH"
+            else:
+                risk_level = "CRITICAL"
+
+            return {
+                "total_exposure": total_exposure,
+                "max_pair_exposure": max_pair_exposure,
+                "margin_usage": margin_usage,
+                "var_95": var_95,
+                "risk_level": risk_level,
+                "active_signals": len(active_signals),
+                "max_allowed_exposure_pct": max_exposure_pct
+            }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate risk exposure: {str(e)}")

@@ -9,7 +9,11 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import os
 
-from .routes import health_router, stocks_router, prices_router, websocket_router, start_price_streaming
+from .routes import (
+    health_router, stocks_router, prices_router,
+    pairs_router, signals_router, cointegration_router, trading_router,
+    websocket_router, start_price_streaming
+)
 from .middleware.cors import setup_cors
 from .middleware.logging import LoggingMiddleware, setup_logging
 
@@ -45,6 +49,10 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(stocks_router)
     app.include_router(prices_router)
+    app.include_router(pairs_router)
+    app.include_router(signals_router)
+    app.include_router(cointegration_router)
+    app.include_router(trading_router)
     app.include_router(websocket_router)
 
     # Startup 이벤트
@@ -83,6 +91,7 @@ def create_app() -> FastAPI:
     print("✅ FastAPI application created successfully")
     print(f"   - Docs: http://localhost:8000/docs")
     print(f"   - Health: http://localhost:8000/api/health")
-    print(f"   - WebSocket: ws://localhost:8000/ws/prices")
+    print(f"   - WebSocket Prices: ws://localhost:8000/ws/prices")
+    print(f"   - WebSocket Signals: ws://localhost:8000/ws/signals")
 
     return app

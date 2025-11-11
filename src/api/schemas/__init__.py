@@ -16,6 +16,36 @@ from .price import (
     HistoricalPriceResponse,
     HistoricalPriceListResponse
 )
+from .pair import (
+    PairResponse,
+    PairListResponse,
+    PairCreateRequest,
+    PairUpdateRequest,
+    PairAnalysisRequest,
+    PairAnalysisResponse
+)
+from .signal import (
+    SignalResponse,
+    SignalListResponse,
+    SignalCreateRequest,
+    SignalUpdateRequest,
+    SignalExecuteRequest,
+    SignalExecuteResponse
+)
+from .cointegration import (
+    CointegrationResponse,
+    CointegrationListResponse,
+    CointegrationAnalyzeRequest,
+    CointegrationAnalyzeResponse
+)
+from .trading import (
+    BacktestRequest,
+    BacktestResponse,
+    PortfolioResponse,
+    TradeExecutionRequest,
+    TradeExecutionResponse,
+    PerformanceResponse
+)
 
 __all__ = [
     # Stock schemas
@@ -27,5 +57,31 @@ __all__ = [
     "PriceResponse",
     "PriceListResponse",
     "HistoricalPriceResponse",
-    "HistoricalPriceListResponse"
+    "HistoricalPriceListResponse",
+    # Pair schemas
+    "PairResponse",
+    "PairListResponse",
+    "PairCreateRequest",
+    "PairUpdateRequest",
+    "PairAnalysisRequest",
+    "PairAnalysisResponse",
+    # Signal schemas
+    "SignalResponse",
+    "SignalListResponse",
+    "SignalCreateRequest",
+    "SignalUpdateRequest",
+    "SignalExecuteRequest",
+    "SignalExecuteResponse",
+    # Cointegration schemas
+    "CointegrationResponse",
+    "CointegrationListResponse",
+    "CointegrationAnalyzeRequest",
+    "CointegrationAnalyzeResponse",
+    # Trading schemas
+    "BacktestRequest",
+    "BacktestResponse",
+    "PortfolioResponse",
+    "TradeExecutionRequest",
+    "TradeExecutionResponse",
+    "PerformanceResponse"
 ]

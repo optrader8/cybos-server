@@ -229,3 +229,68 @@ async def start_price_streaming():
     """실시간 시세 스트리밍 시작"""
     asyncio.create_task(price_streaming_task())
     logger.info("✅ Price streaming task started")
+
+
+# 신호 WebSocket 엔드포인트
+@router.websocket("/ws/signals")
+async def signals_websocket_endpoint(websocket: WebSocket):
+    """
+    실시간 트레이딩 신호 WebSocket 엔드포인트
+
+    클라이언트가 연결하고 페어를 구독하면 실시간 신호를 전송합니다.
+
+    메시지 형식:
+    - 구독: {"action": "subscribe", "pair_ids": ["005930_000660"]}
+    - 구독 해제: {"action": "unsubscribe", "pair_ids": ["005930_000660"]}
+    """
+    await websocket.accept()
+    logger.info(f"Signals WebSocket client connected: {websocket.client}")
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            action = data.get("action")
+
+            if action == "subscribe":
+                pair_ids = data.get("pair_ids", [])
+                await websocket.send_json({
+                    "type": "subscription",
+                    "status": "success",
+                    "pair_ids": pair_ids,
+                    "message": f"Subscribed to {len(pair_ids)} pairs"
+                })
+
+            elif action == "unsubscribe":
+                pair_ids = data.get("pair_ids", [])
+                await websocket.send_json({
+                    "type": "unsubscription",
+                    "status": "success",
+                    "pair_ids": pair_ids
+                })
+
+            elif action == "get_active":
+                # 활성 신호 조회
+                from ...database.models.signal import SignalTable
+                db_path = os.getenv("DATABASE_PATH", "data/cybos.db")
+
+                with get_connection_context(db_path) as conn:
+                    signals = SignalTable.get_active_signals(conn)
+                    await websocket.send_json({
+                        "type": "active_signals",
+                        "count": len(signals),
+                        "signals": [
+                            {
+                                "signal_id": s.signal_id,
+                                "pair_id": s.pair_id,
+                                "signal_type": s.signal_type.value,
+                                "z_score": s.z_score,
+                                "confidence": s.confidence
+                            }
+                            for s in signals[:10]  # 최대 10개
+                        ]
+                    })
+
+    except WebSocketDisconnect:
+        logger.info(f"Signals WebSocket client disconnected: {websocket.client}")
+    except Exception as e:
+        logger.error(f"Signals WebSocket error: {e}")
